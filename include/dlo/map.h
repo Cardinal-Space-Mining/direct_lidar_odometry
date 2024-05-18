@@ -54,9 +54,6 @@ public:
 
 private:
 
-  // void abortTimerCB(const ros::TimerEvent& e);
-  // void publishTimerCB(const ros::TimerEvent& e);
-
   void keyframeCB(const sensor_msgs::msg::PointCloud2::ConstSharedPtr& keyframe);
 
   bool savePcd(std::shared_ptr<direct_lidar_odometry::srv::SavePCD::Request> req,
@@ -64,9 +61,6 @@ private:
 
   void getParams();
 
-  // ros::NodeHandle nh;
-  // ros::Timer abort_timer;
-  rclcpp::TimerBase::SharedPtr publish_timer;
 
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr keyframe_sub;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub;

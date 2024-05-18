@@ -14,12 +14,11 @@
 
       dlo/adaptiveParams: true
 
-      dlo/imu: true
+      dlo/imu: false
       dlo/gravityAlign: false
 
-      dlo/odomNode/odom_frame: "world"   #odom
-      dlo/odomNode/child_frame: "lidar"    #base_link
+      dlo/odomNode/odom_frame: "odom"   #odom
+      dlo/odomNode/child_frame: "base_link"    #base_link
 
-      dlo/mapNode/publishFullMap: false   #true
       dlo/mapNode/publishFreq: 1.0
       dlo/mapNode/leafSize: 0.25

@@ -9,11 +9,6 @@
 
 #include "dlo/map.h"
 
-// void controlC(int sig) {
-
-//   dlo::MapNode::abort();
-
-// }
 
 int main(int argc, char** argv) {
 

@@ -15,8 +15,6 @@
 
 #include "rclcpp/qos.hpp"
 
-// std::atomic<bool> dlo::OdomNode::abort_(false);
-
 
 /**
  * Constructor
@@ -42,7 +40,6 @@ dlo::OdomNode::OdomNode() : Node("dlo_odom_node") {
   this->kf_pub = this->create_publisher<nav_msgs::msg::Odometry>("kfs", 1);
   this->keyframe_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("keyframe", 1);
   this->br = std::make_shared<tf2_ros::TransformBroadcaster>(*this);
-  // this->save_traj_srv = this->nh.advertiseService("save_traj", &dlo::OdomNode::saveTrajectory, this);
 
   this->odom.pose.pose.position.x = 0.;
   this->odom.pose.pose.position.y = 0.;
@@ -200,14 +197,6 @@ void dlo::OdomNode::getParams() {
   dlo::declare_param(this, "dlo/odomNode/odom_frame", this->odom_frame, "odom");
   dlo::declare_param(this, "dlo/odomNode/child_frame", this->child_frame, "base_link");
 
-  // // Get Node NS and Remove Leading Character
-  // std::string ns = ros::this_node::getNamespace();
-  // ns.erase(0,1);
-
-  // // Concatenate Frame Name Strings
-  // this->odom_frame = ns + "/" + this->odom_frame;
-  // this->child_frame = ns + "/" + this->child_frame;
-
   // Gravity alignment
   dlo::declare_param(this, "dlo/gravityAlign", this->gravity_align_, false);
 
@@ -314,17 +303,6 @@ void dlo::OdomNode::stop() {
 
   // ros::shutdown();
 }
-
-
-// /**
-//  * Abort Timer Callback
-//  **/
-
-// void dlo::OdomNode::abortTimerCB(const ros::TimerEvent& e) {
-//   if (abort_) {
-//     stop();
-//   }
-// }
 
 
 /**
@@ -1344,29 +1322,6 @@ void dlo::OdomNode::getSubmapKeyframes() {
   }
 
 }
-
-// bool dlo::OdomNode::saveTrajectory(direct_lidar_odometry::save_traj::Request& req,
-//                                    direct_lidar_odometry::save_traj::Response& res) {
-//   std::string kittipath = req.save_path + "/kitti_traj.txt";
-//   std::ofstream out_kitti(kittipath);
-
-//   std::cout << std::setprecision(2) << "Saving KITTI trajectory to " << kittipath << "... "; std::cout.flush();
-
-//   for (const auto& pose : this->trajectory) {
-//     const auto& t = pose.first;
-//     const auto& q = pose.second;
-//     // Write to Kitti Format
-//     auto R = q.normalized().toRotationMatrix();
-//     out_kitti << std::fixed << std::setprecision(9) 
-//       << R(0, 0) << " " << R(0, 1) << " " << R(0, 2) << " " << t.x() << " " 
-//       << R(1, 0) << " " << R(1, 1) << " " << R(1, 2) << " " << t.y() << " " 
-//       << R(2, 0) << " " << R(2, 1) << " " << R(2, 2) << " " << t.z() << "\n";
-//   }
-
-//   std::cout << "done" << std::endl;
-//   res.success = true;
-//   return res.success;
-// }
 
 /**
  * Debug Statements
