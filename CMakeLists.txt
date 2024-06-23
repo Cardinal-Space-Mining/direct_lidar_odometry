@@ -21,6 +21,9 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(pcl_ros REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_sensor_msgs REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(Threads REQUIRED)
 
@@ -68,7 +71,7 @@ ament_target_dependencies(nano_gicp)
 # Odometry Node
 add_executable(dlo_odom_node src/dlo/odom_node.cc src/dlo/odom.cc)
 target_link_libraries(dlo_odom_node ${PCL_LIBRARIES} ${OpenMP_LIBS} Threads::Threads nano_gicp)
-ament_target_dependencies(dlo_odom_node "tf2_ros" "pcl_ros" "nav_msgs" "pcl_conversions" "rclcpp" "sensor_msgs" "geometry_msgs")
+ament_target_dependencies(dlo_odom_node "tf2_ros" "pcl_ros" "nav_msgs" "pcl_conversions" "rclcpp" "sensor_msgs" "geometry_msgs" "tf2_ros" "tf2_sensor_msgs" "tf2_geometry_msgs")
 
 # Mapping Node
 add_executable (dlo_map_node src/dlo/map_node.cc src/dlo/map.cc)
@@ -77,7 +80,7 @@ ament_target_dependencies(dlo_map_node "tf2_ros" "pcl_ros" "pcl_conversions" "rc
 
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME} nano_gicp nanoflann)
-ament_export_dependencies(rclcpp std_msgs sensor_msgs geometry_msgs pcl_ros)
+ament_export_dependencies(rclcpp std_msgs sensor_msgs geometry_msgs pcl_ros tf2_ros tf2_sensor_msgs tf2_geometry_msgs)
 ament_package()
 
 

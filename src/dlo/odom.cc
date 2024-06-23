@@ -20,7 +20,11 @@
  * Constructor
  **/
 
-dlo::OdomNode::OdomNode() : Node("dlo_odom_node") {
+dlo::OdomNode::OdomNode() :
+  Node("dlo_odom_node"),
+  tfbuffer{ std::make_shared<rclcpp::Clock>(RCL_ROS_TIME) },
+  tflistener{ tfbuffer }
+{
 
   this->getParams();
 
@@ -39,6 +43,8 @@ dlo::OdomNode::OdomNode() : Node("dlo_odom_node") {
   this->pose_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("pose", 1);
   this->kf_pub = this->create_publisher<nav_msgs::msg::Odometry>("kfs", 1);
   this->keyframe_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("keyframe", 1);
+  this->filtered_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("filtered_scan", 1);
+
   this->br = std::make_shared<tf2_ros::TransformBroadcaster>(*this);
 
   this->odom.pose.pose.position.x = 0.;
@@ -82,7 +88,7 @@ dlo::OdomNode::OdomNode() : Node("dlo_odom_node") {
   this->imu_buffer.set_capacity(this->imu_buffer_size_);
   this->first_imu_time = 0.;
 
-  this->original_scan = std::make_shared<pcl::PointCloud<PointType>>();
+  this->export_scan = std::make_shared<pcl::PointCloud<PointType>>();
   this->current_scan = std::make_shared<pcl::PointCloud<PointType>>();
   this->current_scan_t = std::make_shared<pcl::PointCloud<PointType>>();
 
@@ -196,6 +202,7 @@ void dlo::OdomNode::getParams() {
   // Frames
   dlo::declare_param(this, "dlo/odomNode/odom_frame", this->odom_frame, "odom");
   dlo::declare_param(this, "dlo/odomNode/child_frame", this->child_frame, "base_link");
+  dlo::declare_param(this, "dlo/odomNode/transform_to_child", this->transform_to_child_, false);
 
   // Gravity alignment
   dlo::declare_param(this, "dlo/gravityAlign", this->gravity_align_, false);
@@ -222,6 +229,9 @@ void dlo::OdomNode::getParams() {
   dlo::declare_param(this, "dlo/odomNode/initialPose/orientation/z", qz, 0.0);
   this->initial_position_ = Eigen::Vector3f(px, py, pz);
   this->initial_orientation_ = Eigen::Quaternionf(qw, qx, qy, qz);
+
+  // Export Filtered
+  dlo::declare_param(this, "dlo/odomNode/filteredScan/use", this->export_filtered, false);
 
   // Crop Box Filter
   dlo::declare_param(this, "dlo/odomNode/preprocessing/cropBoxFilter/use", this->crop_use_, false);
@@ -312,6 +322,9 @@ void dlo::OdomNode::stop() {
 void dlo::OdomNode::publishToROS() {
   this->publishPose();
   this->publishTransform();
+  if (this->export_filtered) {
+    this->publishFilteredScan();
+  }
 }
 
 
@@ -387,7 +400,7 @@ void dlo::OdomNode::publishTransform() {
   transformStamped.transform.rotation.y = this->rotq.y();
   transformStamped.transform.rotation.z = this->rotq.z();
 
-  br->sendTransform(transformStamped);
+  this->br->sendTransform(transformStamped);
 
 }
 
@@ -427,13 +440,31 @@ void dlo::OdomNode::publishKeyframe() {
 
 
 /**
+ * Publish filtered scan in the global frame
+ **/
+void dlo::OdomNode::publishFilteredScan() {
+
+  try {
+    sensor_msgs::msg::PointCloud2 scan;
+    pcl::toROSMsg(*this->export_scan, scan);
+
+    const tf2::TimePoint tp{ std::chrono::seconds{scan.header.stamp.sec} + std::chrono::nanoseconds{scan.header.stamp.nanosec} };
+    const geometry_msgs::msg::TransformStamped tf = this->tfbuffer.lookupTransform(this->child_frame, scan.header.frame_id, tp);
+    tf2::doTransform(scan, scan, tf);
+
+    this->filtered_pub->publish(scan);
+  } catch (const std::exception& e) {
+    // RCLCPP_ERROR(this->get_logger(), "%s", e.what());
+  }
+
+}
+
+
+/**
  * Preprocessing
  **/
 
 void dlo::OdomNode::preprocessPoints() {
-
-  // Original Scan
-  *this->original_scan = *this->current_scan;
 
   // Remove NaNs
   std::vector<int> idx;
@@ -445,6 +476,9 @@ void dlo::OdomNode::preprocessPoints() {
     this->crop.setInputCloud(this->current_scan);
     this->crop.filter(*this->current_scan);
   }
+
+  // Filtered "environment" scan for export
+  *this->export_scan = pcl::PointCloud<PointType>{*this->current_scan};
 
   // Voxel Grid Filter
   if (this->vf_scan_use_) {
@@ -617,14 +651,26 @@ void dlo::OdomNode::initializeDLO() {
  **/
 
 void dlo::OdomNode::icpCB(const sensor_msgs::msg::PointCloud2::ConstSharedPtr& pc) {
+  sensor_msgs::msg::PointCloud2::SharedPtr pc_ = std::make_shared<sensor_msgs::msg::PointCloud2>(*pc);
 
   double then = this->now().seconds();
   this->scan_stamp = pc->header.stamp;
   this->curr_frame_stamp = rclcpp::Time(pc->header.stamp).seconds();
 
+  if (this->transform_to_child_) {
+    try {
+      const tf2::TimePoint tp{ std::chrono::seconds{pc->header.stamp.sec} + std::chrono::nanoseconds{pc->header.stamp.nanosec} };
+      const geometry_msgs::msg::TransformStamped tf = this->tfbuffer.lookupTransform(this->child_frame, pc->header.frame_id, tp);
+      tf2::doTransform(*pc_, *pc_, tf);
+    } catch (const std::exception& e) {
+      RCLCPP_ERROR(this->get_logger(), "%s", e.what());
+      if (this->dlo_initialized) return;   // we have already been using transformed clouds so we don't want to use a non-transformed sample
+    }
+  }
+
   // If there are too few points in the pointcloud, try again
   this->current_scan = std::make_shared<pcl::PointCloud<PointType>>();
-  pcl::fromROSMsg(*pc, *this->current_scan);
+  pcl::fromROSMsg(*pc_, *this->current_scan);
   if (this->current_scan->points.size() < this->gicp_min_num_points_) {
     RCLCPP_FATAL(this->get_logger(), "Low number of points!");
     return;
@@ -695,6 +741,16 @@ void dlo::OdomNode::imuCB(const sensor_msgs::msg::Imu::SharedPtr imu) {
 
   if (!this->imu_use_) {
     return;
+  }
+
+  if (this->transform_to_child_) {
+    try {
+      const tf2::TimePoint tp{ std::chrono::seconds{imu->header.stamp.sec} + std::chrono::nanoseconds{imu->header.stamp.nanosec} };
+      const geometry_msgs::msg::TransformStamped tf = this->tfbuffer.lookupTransform(this->child_frame, imu->header.frame_id, tp);
+      tf2::doTransform(*imu, *imu, tf);
+    } catch (const std::exception& e) {
+      RCLCPP_ERROR(this->get_logger(), "%s", e.what());
+    }
   }
 
   double ang_vel[3], lin_accel[3];

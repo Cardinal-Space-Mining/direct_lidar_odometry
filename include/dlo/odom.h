@@ -19,22 +19,19 @@
 #include <pcl/surface/concave_hull.h>
 #include <pcl/surface/convex_hull.h>
 #include <pcl_conversions/pcl_conversions.h>
-// #include <pcl_ros/impl/transforms.hpp>
-// #include <pcl_ros/point_cloud.h>
-// #include <pcl_ros/transforms.h>
+
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 #include <tf2_ros/transform_broadcaster.h>
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <nav_msgs/msg/odometry.hpp>
-// #include <sensor_msgs/CameraInfo.h>
-// #include <sensor_msgs/Image.h>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
-// #include <direct_lidar_odometry/save_pcd.h>
-// #include <direct_lidar_odometry/save_traj.h>
 #include <nano_gicp/nano_gicp.hpp>
+
 
 typedef pcl::PointXYZI PointType;
 
@@ -66,6 +63,7 @@ private:
   void publishPose();
   void publishTransform();
   void publishKeyframe();
+  void publishFilteredScan();
 
   void preprocessPoints();
   void initializeInputTarget();
@@ -96,11 +94,8 @@ private:
 
   double first_imu_time;
 
-  // ros::NodeHandle nh;
-  // ros::Timer abort_timer;
-  
-  // ros::ServiceServer save_traj_srv;
-
+  tf2_ros::Buffer tfbuffer;
+  tf2_ros::TransformListener tflistener;
   std::shared_ptr<tf2_ros::TransformBroadcaster> br;
 
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr icp_sub;
@@ -110,6 +105,7 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr keyframe_pub;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr kf_pub;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr filtered_pub;
 
   Eigen::Vector3f origin;
   std::vector<std::pair<Eigen::Vector3f, Eigen::Quaternionf>> trajectory;
@@ -121,10 +117,12 @@ private:
 
   std::string odom_frame;
   std::string child_frame;
+  bool transform_to_child_;
 
-  pcl::PointCloud<PointType>::Ptr original_scan;
+  pcl::PointCloud<PointType>::Ptr export_scan;
   pcl::PointCloud<PointType>::Ptr current_scan;
   pcl::PointCloud<PointType>::Ptr current_scan_t;
+  bool export_filtered;
 
   pcl::PointCloud<PointType>::Ptr keyframes_cloud;
   pcl::PointCloud<PointType>::Ptr keyframe_cloud;
