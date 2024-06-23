@@ -244,7 +244,8 @@ private:
   Eigen::Quaternionf initial_orientation_;
 
   bool crop_use_;
-  double crop_size_;
+  // double crop_size_;
+  Eigen::Vector4f crop_min_, crop_max_;
 
   bool vf_scan_use_;
   double vf_scan_res_;

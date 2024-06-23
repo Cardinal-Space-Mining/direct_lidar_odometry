@@ -131,8 +131,10 @@ dlo::OdomNode::OdomNode() :
   this->gicp.setSearchMethodTarget(temp, true);
 
   this->crop.setNegative(true);
-  this->crop.setMin(Eigen::Vector4f(-this->crop_size_, -this->crop_size_, -this->crop_size_, 1.0));
-  this->crop.setMax(Eigen::Vector4f(this->crop_size_, this->crop_size_, this->crop_size_, 1.0));
+  // this->crop.setMin(Eigen::Vector4f(-this->crop_size_, -this->crop_size_, -this->crop_size_, 1.0));
+  // this->crop.setMax(Eigen::Vector4f(this->crop_size_, this->crop_size_, this->crop_size_, 1.0));
+  this->crop.setMin(this->crop_min_);
+  this->crop.setMax(this->crop_max_);
 
   this->vf_scan.setLeafSize(this->vf_scan_res_, this->vf_scan_res_, this->vf_scan_res_);
   this->vf_submap.setLeafSize(this->vf_submap_res_, this->vf_submap_res_, this->vf_submap_res_);
@@ -235,7 +237,13 @@ void dlo::OdomNode::getParams() {
 
   // Crop Box Filter
   dlo::declare_param(this, "dlo/odomNode/preprocessing/cropBoxFilter/use", this->crop_use_, false);
-  dlo::declare_param(this, "dlo/odomNode/preprocessing/cropBoxFilter/size", this->crop_size_, 1.0);
+  // dlo::declare_param(this, "dlo/odomNode/preprocessing/cropBoxFilter/size", this->crop_size_, 1.0);
+  std::vector<double> _min{-1.0, -1.0, -1.0}, _max{1.0, 1.0, 1.0};
+  dlo::declare_param(this, "dlo/odomNode/preprocessing/cropBoxFilter/min", _min, _min);
+  dlo::declare_param(this, "dlo/odomNode/preprocessing/cropBoxFilter/max", _max, _max);
+  this->crop_min_ = Eigen::Vector4f{ (float)_min[0], (float)_min[1], (float)_min[2], 1.f };
+  this->crop_max_ = Eigen::Vector4f{ (float)_max[0], (float)_max[1], (float)_max[2], 1.f };
+
 
   // Voxel Grid Filter
   dlo::declare_param(this, "dlo/odomNode/preprocessing/voxelFilter/scan/use", this->vf_scan_use_, true);
