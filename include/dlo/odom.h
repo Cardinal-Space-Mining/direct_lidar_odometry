@@ -10,6 +10,10 @@
 #include "dlo/dlo.h"
 #include "rclcpp/rclcpp.hpp"
 
+#include <deque>
+#include <utility>
+#include <chrono>
+
 #include <boost/circular_buffer.hpp>
 #include <boost/algorithm/string.hpp>
 
@@ -160,6 +164,10 @@ private:
   nav_msgs::msg::Odometry kf;
 
   geometry_msgs::msg::PoseStamped pose_ros;
+
+  std::deque<std::pair<std::chrono::system_clock::time_point, Eigen::Vector<float, 6>>> pose_variance_samples;
+  std::chrono::duration<double> variance_sample_history;
+  bool calculate_odom_variance;
 
   Eigen::Matrix4f T;
   Eigen::Matrix4f T_s2s, T_s2s_prev;

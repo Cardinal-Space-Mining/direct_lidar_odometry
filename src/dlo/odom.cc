@@ -232,6 +232,12 @@ void dlo::OdomNode::getParams() {
   this->initial_position_ = Eigen::Vector3f(px, py, pz);
   this->initial_orientation_ = Eigen::Quaternionf(qw, qx, qy, qz);
 
+  // Variance calculation
+  double _sample_history;
+  dlo::declare_param(this, "dlo/odomNode/variance/use", this->calculate_odom_variance, false);
+  dlo::declare_param(this, "dlo/odomNode/variance/sample_history", _sample_history, 1.0);
+  this->variance_sample_history = std::chrono::duration<double>{ _sample_history };
+
   // Export Filtered
   dlo::declare_param(this, "dlo/odomNode/filteredScan/use", this->export_filtered, false);
 
@@ -355,6 +361,42 @@ void dlo::OdomNode::publishPose() {
   }
 
   q_last = this->rotq;
+
+  if (this->calculate_odom_variance) {
+    auto _now = std::chrono::system_clock::now();
+    while (!this->pose_variance_samples.empty()) {
+      if (_now - this->pose_variance_samples.back().first > this->variance_sample_history) {
+        this->pose_variance_samples.pop_back();
+      }
+      else break;
+    }
+
+    using Vec6f = Eigen::Vector<float, 6>;
+
+    this->pose_variance_samples.push_front( { _now, Vec6f::Zero() } );
+    *reinterpret_cast<Eigen::Vector3f*>(this->pose_variance_samples.front().second.data() + 0) = this->pose;
+    *reinterpret_cast<Eigen::Vector3f*>(this->pose_variance_samples.front().second.data() + 3) = this->rotq.toRotationMatrix().eulerAngles(0, 1, 2);
+
+    const size_t samples = this->pose_variance_samples.size();
+    Vec6f variance = Vec6f::Zero();
+
+    if (samples > 1) {
+      Vec6f mean = Vec6f::Zero();
+      for (const auto& s : this->pose_variance_samples) {
+        mean += s.second;
+      }
+      mean /= samples;
+      for (const auto& s : this->pose_variance_samples) {
+        Vec6f _v = s.second - mean;
+        variance += _v.cwiseProduct(_v);
+      }
+      variance /= (samples - 1);
+
+      for (size_t i = 0; i < 6; i++) {
+        this->odom.pose.covariance[i * 7] = variance[i];
+      }
+    }
+  }
 
   this->odom.pose.pose.position.x = this->pose[0];
   this->odom.pose.pose.position.y = this->pose[1];
