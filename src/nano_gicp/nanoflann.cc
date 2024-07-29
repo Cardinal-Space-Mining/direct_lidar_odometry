@@ -40,7 +40,7 @@
  *************************************************************************/
 
 #include <dlo/dlo.h>
-#include <nano_gicp/nanoflann.hpp>
 #include <nano_gicp/impl/nanoflann_impl.hpp>
+#include <nano_gicp/nanoflann.hpp>
 
-template class nanoflann::KdTreeFLANN<PointType>;
+template class nanoflann::KdTreeFLANN<dlo::PointType>;

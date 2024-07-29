@@ -9,25 +9,19 @@
 
 #include "dlo/odom.h"
 
-// void controlC(int sig) {
 
-//   dlo::OdomNode::abort();
+int main(int argc, char ** argv)
+{
+    rclcpp::init(argc, argv);
 
-// }
+    auto node = std::make_shared<dlo::OdomNode>();
+    rclcpp::executors::MultiThreadedExecutor executor;
 
-int main(int argc, char** argv) {
+    node->start();
+    executor.add_node(node);
+    executor.spin();
 
-  rclcpp::init(argc, argv);
+    rclcpp::shutdown();
 
-  auto node = std::make_shared<dlo::OdomNode>();
-  rclcpp::executors::MultiThreadedExecutor executor;
-
-  node->start();
-  executor.add_node(node);
-  executor.spin();
-
-  rclcpp::shutdown();
-
-  return 0;
-
+    return 0;
 }
