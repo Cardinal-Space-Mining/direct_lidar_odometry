@@ -26,6 +26,10 @@ dlo::MapNode::MapNode() : Node("dlo_map_node") {
 
   // initialize map
   this->dlo_map = std::make_shared<pcl::PointCloud<PointType>>();
+
+  if (this->publish_full_map_) {
+    this->publish_timer = this->create_wall_timer(std::chrono::milliseconds((int)(1000.0 / this->publish_freq_)), std::bind(&dlo::MapNode::publishTimerCB, this));
+  }
 }
 
 
@@ -81,14 +85,25 @@ void dlo::MapNode::keyframeCB(const sensor_msgs::msg::PointCloud2::ConstSharedPt
   this->map_stamp = keyframe->header.stamp;
   *this->dlo_map += *keyframe_pcl;
 
-  if (keyframe_pcl->points.size() == keyframe_pcl->width * keyframe_pcl->height) {
+  if (!this->publish_full_map_) {
+    if (keyframe_pcl->points.size() == keyframe_pcl->width * keyframe_pcl->height) {
+      sensor_msgs::msg::PointCloud2 map_ros;
+      pcl::toROSMsg(*keyframe_pcl, map_ros);
+      map_ros.header.stamp = this->now();
+      map_ros.header.frame_id = this->odom_frame;
+      this->map_pub->publish(map_ros);
+    }
+  }
+}
+
+void dlo::MapNode::publishTimerCB() {
+  if (dlo_map->points.size() == dlo_map->width * dlo_map->height) {
     sensor_msgs::msg::PointCloud2 map_ros;
-    pcl::toROSMsg(*keyframe_pcl, map_ros);
+    pcl::toROSMsg(*dlo_map, map_ros);
     map_ros.header.stamp = this->now();
     map_ros.header.frame_id = this->odom_frame;
     this->map_pub->publish(map_ros);
-  }
-
+  } 
 }
 
 bool dlo::MapNode::savePcd(std::shared_ptr<direct_lidar_odometry::srv::SavePCD::Request> req,
